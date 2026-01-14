@@ -4,9 +4,9 @@
   "description": "Ephemeral OpenTelemetry ingest endpoint and UI for Cloudflare Durable Objects",
   "type": "module",
   "scripts": {
-    "dev": "npx alchemy run",
-    "deploy": "npx alchemy run --stage production",
-    "destroy": "npx alchemy destroy"
+    "dev": "npx tsx alchemy.run.ts",
+    "deploy": "npx tsx alchemy.run.ts --stage production",
+    "destroy": "npx tsx alchemy.run.ts --destroy"
   },
   "dependencies": {
     "alchemy": "^0.83.1",

@@ -6,6 +6,7 @@ import { Layout } from "./ui/components/Layout.tsx";
 import { EventList } from "./ui/components/EventList.tsx";
 import { RawViewer } from "./ui/components/RawViewer.tsx";
 import { extractTraceMetadata, extractLogMetadata } from "./lib/otlp.ts";
+import { generateDemoTraces, generateDemoLogs } from "./lib/demo-data.ts";
 
 // Re-export Durable Object classes
 export { InboxDO } from "./durable-objects/inbox.ts";
@@ -20,7 +21,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS for API endpoints
 app.use("/api/*", cors());
-app.use("/i/*/api/*", cors());
+app.use("/i/:inboxId/api/*", cors());
 
 // ==================== Top-level API routes ====================
 
@@ -101,6 +102,53 @@ app.delete("/api/inboxes/:id", async (c) => {
   await dirStub.deleteInbox(inboxId);
 
   return c.json({ success: true });
+});
+
+// Create demo inbox with sample data
+app.post("/api/demo", async (c) => {
+  const dirId = c.env.DIRECTORY_DO.idFromName("global");
+  const dirStub = c.env.DIRECTORY_DO.get(dirId);
+
+  // Create a new inbox for the demo
+  const inbox = await dirStub.createInbox("Demo");
+
+  const id = c.env.INBOX_DO.idFromName(inbox.id);
+  const stub = c.env.INBOX_DO.get(id);
+
+  // Generate and insert demo traces
+  const demoTraces = generateDemoTraces();
+  for (const trace of demoTraces) {
+    const payload = new TextEncoder().encode(JSON.stringify(trace));
+    const metadata = extractTraceMetadata(payload, "application/json");
+    await stub.appendEvent({
+      eventType: "trace",
+      contentType: "application/json",
+      payload,
+      metadata,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Generate and insert demo logs
+  const demoLogs = generateDemoLogs();
+  for (const log of demoLogs) {
+    const payload = new TextEncoder().encode(JSON.stringify(log));
+    const metadata = extractLogMetadata(payload, "application/json");
+    await stub.appendEvent({
+      eventType: "log",
+      contentType: "application/json",
+      payload,
+      metadata,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Update inbox activity timestamp
+  await dirStub.touchInbox(inbox.id, "ingest");
+
+  // Redirect to the dashboard
+  const origin = new URL(c.req.url).origin;
+  return c.redirect(`${origin}/i/${inbox.id}/ui`);
 });
 
 // ==================== Ingest routes ====================
@@ -466,6 +514,28 @@ open ${origin}/i/abc123/ui`;
 OTEL_EXPORTER_OTLP_ENDPOINT=${origin}/i/<inboxId>
 OTEL_EXPORTER_OTLP_PROTOCOL=http/json`;
 
+  const effectConfig = `// Effect with @effect/opentelemetry
+import { NodeSdk } from "@effect/opentelemetry"
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base"
+import { Effect } from "effect"
+
+const TracingLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "my-service" },
+  spanProcessor: new BatchSpanProcessor(
+    new OTLPTraceExporter({
+      url: "${origin}/i/<inboxId>/v1/traces",
+    })
+  ),
+}))
+
+// Use in your program
+const program = Effect.gen(function* () {
+  // Your effectful code with automatic tracing
+})
+
+Effect.runPromise(program.pipe(Effect.provide(TracingLive)))`;
+
   return c.html(
     <Layout title="Home">
       <section>
@@ -474,6 +544,17 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/json`;
           Ephemeral OpenTelemetry ingest for development. Create an inbox to get
           started.
         </p>
+        <form action="/api/demo" method="post" style="margin-bottom: 1.5rem;">
+          <button
+            type="submit"
+            style="background: #238636; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: 500;"
+          >
+            Try Demo
+          </button>
+          <span style="margin-left: 1rem; color: #8b949e; font-size: 0.9rem;">
+            Creates an inbox with sample traces and logs
+          </span>
+        </form>
         <div class="endpoints">
           <h3>Quick Start</h3>
           <div class="endpoint">
@@ -494,6 +575,11 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/json`;
       <section>
         <h2>Configure OpenTelemetry SDK</h2>
         <pre>{sdkConfig}</pre>
+      </section>
+
+      <section>
+        <h2>Effect (TypeScript)</h2>
+        <pre>{effectConfig}</pre>
       </section>
     </Layout>
   );
