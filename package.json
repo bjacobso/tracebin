@@ -1,0 +1,22 @@
+{
+  "name": "tracebin",
+  "version": "0.1.0",
+  "description": "Ephemeral OpenTelemetry ingest endpoint and UI for Cloudflare Durable Objects",
+  "type": "module",
+  "scripts": {
+    "dev": "npx alchemy run",
+    "deploy": "npx alchemy run --stage production",
+    "destroy": "npx alchemy destroy"
+  },
+  "dependencies": {
+    "alchemy": "^0.83.1",
+    "hono": "^4.7.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250121.0",
+    "@types/node": "^22.10.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.42.2"
+  }
+}
