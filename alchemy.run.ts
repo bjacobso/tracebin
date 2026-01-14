@@ -2,6 +2,8 @@ import alchemy from "alchemy";
 import { Worker, DurableObjectNamespace } from "alchemy/cloudflare";
 
 const app = await alchemy("tracebin");
+const stage = app.stage;
+const workerName = stage === "production" ? "tracebin" : `tracebin-${stage}`;
 
 // Durable Object namespaces
 const inboxDO = DurableObjectNamespace("inbox-do", {
@@ -16,7 +18,7 @@ const directoryDO = DurableObjectNamespace("directory-do", {
 
 // Main worker
 export const worker = await Worker("tracebin-worker", {
-  name: "tracebin",
+  name: workerName,
   entrypoint: "./src/worker.tsx",
   url: true,
   bindings: {

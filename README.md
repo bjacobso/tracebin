@@ -81,6 +81,30 @@ provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 ```
 
+```typescript
+// Effect with @effect/opentelemetry
+import { NodeSdk } from "@effect/opentelemetry"
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base"
+import { Effect } from "effect"
+
+const TracingLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "my-service" },
+  spanProcessor: new BatchSpanProcessor(
+    new OTLPTraceExporter({
+      url: "https://tracebin.bjacobso.workers.dev/i/<inboxId>/v1/traces",
+    })
+  ),
+}))
+
+// Use in your program
+const program = Effect.gen(function* () {
+  // Your effectful code with automatic tracing
+})
+
+Effect.runPromise(program.pipe(Effect.provide(TracingLive)))
+```
+
 ### Send a Test Trace
 
 ```bash
